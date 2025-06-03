@@ -72,7 +72,7 @@ function App() {
     }
   };
 
- const handleUpdateTask = async (id) => {
+ const updateTask = async (id) => {
   try {
     const res = await fetch(`http://localhost:8090/todos/${id}`, {
       method: "PUT",
@@ -125,14 +125,12 @@ return (<div style={{ padding: '20px' }}>
       placeholder="Task description"
       value={newTask}
       onChange={(e) => setNewTask(e.target.value)}
-      style={{ marginRight: '8px' }}
       required
     />
 
     <select
       value={newStatus}
       onChange={(e) => setNewStatus(e.target.value)}
-      style={{ marginRight: '8px' }}
     >
       <option value="">Select Status (optional)</option>
       {statusOptions.map((status) => (
@@ -156,7 +154,6 @@ return (<div style={{ padding: '20px' }}>
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
-            marginBottom: '8px',
           }}
         >
           
@@ -167,12 +164,10 @@ return (<div style={{ padding: '20px' }}>
                   type="text"
                   value={editText}
                   onChange={(e) => setEditText(e.target.value)}
-                  style={{ marginRight: '8px' }}
                 />
                 <select
                   value={editStatus}
                   onChange={(e) => setEditStatus(e.target.value)}
-                  style={{ marginRight: '8px' }}
                 >
                   {statusOptions.map((s) => (
                     <option key={s} value={s}>
@@ -183,9 +178,7 @@ return (<div style={{ padding: '20px' }}>
               </div>
               <div>
                 <button
-                  onClick={() => handleUpdateTask(task.id)}
-                  style={{ marginRight: '8px' }}
-                >
+                  onClick={() => updateTask(task.id)}>
                   Save
                 </button>
                 <button onClick={() => setEditingTaskId(null)}>Cancel</button>
@@ -200,7 +193,6 @@ return (<div style={{ padding: '20px' }}>
                 <button
                   onClick={() => moveStatusUp(task)}
                   disabled={task.status === 'Completed'}
-                  style={{ marginRight: '8px' }}
                 >
                   Status Up
                 </button>
@@ -210,7 +202,6 @@ return (<div style={{ padding: '20px' }}>
                     setEditText(task.task);
                     setEditStatus(task.status);
                   }}
-                  style={{ marginRight: '8px' }}
                 >
                   Edit
                 </button>
