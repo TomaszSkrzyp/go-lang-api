@@ -87,11 +87,16 @@ func (ts *todo_storage) moveStatusUp(id string) (string, bool) {
 		return "", false
 	}
 	currentStatus := (*v).Status
-	nextStatus := map[string]string{"Pending": "In Progress", "In Progress": "Done"}
+	nextStatus := map[string]string{"Canceled": "Pending", "Pending": "In Progress", "In Progress": "Completed"}
 	newStatus, newStatusOk := nextStatus[currentStatus]
 	if !newStatusOk {
 		return "", false
 	}
 	v.Status = newStatus
 	return newStatus, true
+}
+func (ts *todo_storage) seedSampleData() {
+	ts.add("Buy groceries", "Pending")
+	ts.add("Clean the house", "Pending")
+	ts.add("Finish project report", "Completed")
 }

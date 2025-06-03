@@ -33,7 +33,7 @@ func main() {
 	router.HandleFunc("/todos/{id}", storage.handleRemove).Methods("DELETE")
 	router.HandleFunc("/todos", storage.handleAdd).Methods("POST")
 	router.HandleFunc("/todos", storage.handleGetAll).Methods("GET")
-
+	storage.seedSampleData()
 	handlersWithCors := enableCors(router)
 	http.ListenAndServe(":8090", handlersWithCors)
 }
