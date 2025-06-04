@@ -10,8 +10,8 @@ import (
 
 func (ts *todo_storage) handleGet(w http.ResponseWriter, r *http.Request) {
 	itemId := mux.Vars(r)["id"]
-	item, found := ts.getOne(itemId)
-	if found {
+	item, err := ts.getOne(itemId)
+	if err == nil {
 		w.WriteHeader(http.StatusOK)
 		json.NewEncoder(w).Encode(item)
 	} else {
@@ -21,42 +21,58 @@ func (ts *todo_storage) handleGet(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 }
-
 func (ts *todo_storage) handleAdd(w http.ResponseWriter, r *http.Request) {
 	var newItem map[string]string
-	err := json.NewDecoder(r.Body).Decode(&newItem)
-	if err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+	if err := json.NewDecoder(r.Body).Decode(&newItem); err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Invalid request body"})
 		return
 	}
 
 	task, taskOk := newItem["task"]
 	status, statusOk := newItem["status"]
+	due, dueOk := newItem["due"]
 
 	if !taskOk {
-		http.Error(w, "Missing a required field: task", http.StatusBadRequest)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Missing a required field: task"})
 		return
 	}
 	if !statusOk {
 		status = "Pending"
 	}
 	if !isValidStatus(status) {
-		http.Error(w, "Invalid status value", http.StatusBadRequest)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Invalid status value"})
+		return
+	}
+	if !dueOk || due == "" {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Missing or empty required field: due"})
 		return
 	}
 
-	itemId := ts.add(task, status)
+	itemId, err := ts.add(task, status, due)
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Failed to add task: " + err.Error()})
+		return
+	}
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	resp := map[string]string{
-		"message": "Task updated successfully",
+		"message": "Task added successfully",
 		"id":      itemId,
 	}
 	if !statusOk {
 		resp["note"] = "Status not provided, defaulted to 'Pending'"
 	}
-
 	json.NewEncoder(w).Encode(resp)
 }
 
@@ -73,7 +89,14 @@ func (ts *todo_storage) handleGetAll(w http.ResponseWriter, r *http.Request) {
 	if err != nil || limit < 1 {
 		limit = 10
 	}
-	allTasks := ts.getAll()
+
+	allTasks, err := ts.getAll()
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Failed to fetch tasks" + err.Error()})
+		return
+	}
 
 	var filtered []todo_item
 
@@ -84,6 +107,7 @@ func (ts *todo_storage) handleGetAll(w http.ResponseWriter, r *http.Request) {
 			break
 		}
 	}
+
 	if isValidStatus {
 		for _, item := range allTasks {
 			if statusFilter == item.Status {
@@ -93,6 +117,7 @@ func (ts *todo_storage) handleGetAll(w http.ResponseWriter, r *http.Request) {
 	} else {
 		filtered = allTasks
 	}
+
 	start := (page - 1) * limit
 	if start > len(filtered) {
 		start = len(filtered)
@@ -102,25 +127,26 @@ func (ts *todo_storage) handleGetAll(w http.ResponseWriter, r *http.Request) {
 		end = len(filtered)
 	}
 	paged := filtered[start:end]
-	w.Header().Set("Content-Type", "application/json")
 
+	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"page":  page,
 		"limit": limit,
 		"total": len(filtered),
 		"tasks": paged,
 	})
-
 }
 
 func (ts *todo_storage) handleRemove(w http.ResponseWriter, r *http.Request) {
 	itemId := mux.Vars(r)["id"]
 	if itemId == "" {
-		http.Error(w, "Missing id in URL path", http.StatusBadRequest)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Missing id in URL path"})
 		return
 	}
-	ok := ts.remove(itemId)
-	if ok {
+	err := ts.remove(itemId)
+	if err == nil {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		json.NewEncoder(w).Encode(map[string]string{
@@ -128,37 +154,51 @@ func (ts *todo_storage) handleRemove(w http.ResponseWriter, r *http.Request) {
 			"id":      itemId,
 		})
 	} else {
-		http.Error(w, "Failed to remove task", http.StatusInternalServerError)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Failed to remove task" + err.Error()})
+		return
 	}
 }
 
 func (ts *todo_storage) handleUpdateTask(w http.ResponseWriter, r *http.Request) {
 	itemId := mux.Vars(r)["id"]
 	if itemId == "" {
-		http.Error(w, "Missing id in URL path", http.StatusBadRequest)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Missing id in URL path"})
 		return
 	}
 	var newItem map[string]string
-	err := json.NewDecoder(r.Body).Decode(&newItem)
-	if err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+	if err := json.NewDecoder(r.Body).Decode(&newItem); err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{
+			"error": "Invalid request body",
+		})
 		return
+
 	}
 
 	changeStatusUpStr, changeOk := newItem["changeUp"]
 	task, taskOk := newItem["task"]
 	status, statusOk := newItem["status"]
+	due, dueOk := newItem["due"]
 
 	if changeOk {
 		changeStatusUp, err := strconv.ParseBool(changeStatusUpStr)
 		if err != nil {
-			http.Error(w, "Invalid value for 'changeUp'; expected 'true' or 'false'", http.StatusBadRequest)
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(map[string]string{
+				"error": "Invalid value for 'changeUp'; expected 'true' or 'false'",
+			})
 			return
 		}
 		if changeStatusUp {
-			newStatus, success := ts.moveStatusUp(itemId)
+			newStatus, err := ts.moveStatusUp(itemId)
 			w.Header().Set("Content-Type", "application/json")
-			if success {
+			if err == nil {
 				w.WriteHeader(http.StatusOK)
 				json.NewEncoder(w).Encode(map[string]string{
 					"message":   "Status moved up",
@@ -177,18 +217,35 @@ func (ts *todo_storage) handleUpdateTask(w http.ResponseWriter, r *http.Request)
 	}
 
 	if !taskOk {
-		http.Error(w, "Missing 'task' field", http.StatusBadRequest)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{
+			"error": "Missing 'task' field",
+		})
 		return
 	}
 	if !statusOk {
 		status = "Pending"
 	}
+	if !dueOk {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{
+			"error": "Missing 'due' field",
+		})
+		return
+	}
 	if !isValidStatus(status) {
-		http.Error(w, "Invalid status value", http.StatusBadRequest)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{
+			"error": "Invalid status value",
+		})
 		return
 	}
 
-	if ts.changeTask(itemId, task, status) {
+	err := ts.changeTask(itemId, task, status, due)
+	if err == nil {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		resp := map[string]string{
@@ -198,9 +255,14 @@ func (ts *todo_storage) handleUpdateTask(w http.ResponseWriter, r *http.Request)
 		if !statusOk {
 			resp["note"] = "Status not provided, defaulted to 'Pending'"
 		}
-
 		json.NewEncoder(w).Encode(resp)
 	} else {
-		http.Error(w, "Failed to update task", http.StatusInternalServerError)
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{
+			"error": "Failed to update task: " + err.Error(),
+		})
+		return
 	}
 }

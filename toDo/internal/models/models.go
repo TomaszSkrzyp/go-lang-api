@@ -4,6 +4,7 @@ type todo_item struct {
 	ID     string `json:"id"`
 	Task   string `json:"task"`
 	Status string `json:"status"`
+	Due    string `json:"due"`
 }
 
 var possibleStatus = []string{"Completed", "In Progress", "Pending", "Canceled"}
