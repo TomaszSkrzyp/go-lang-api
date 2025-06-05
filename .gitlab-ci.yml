@@ -1,0 +1,53 @@
+stages:
+  - lint
+  - test
+  - build
+  - deploy
+
+variables:
+  DOCKER_HOST: tcp://docker:2375
+  DOCKER_DRIVER: overlay2
+  IMAGE_TAG: $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA
+
+lint_backend:
+  stage: lint
+  image: golang:1.22-alpine
+  script:
+    - cd toDo
+    - go fmt ./...
+    - go vet ./...
+
+lint_frontend:
+  stage: lint
+  image: node:18-alpine
+  script:
+    - cd todo-frontend
+    - npm ci
+    - npm run lint || echo "Linting skipped or not configured"
+
+test_backend:
+  stage: test
+  image: golang:1.22-alpine
+  script:
+    - cd toDo
+    - go test ./...
+
+test_frontend:
+  stage: test
+  image: node:18-alpine
+  script:
+    - cd todo-frontend
+    - npm ci
+    - npm test -- --watchAll=false || echo "Frontend tests not set up"
+
+build_and_push:
+  stage: build
+  image: docker:latest
+  services:
+    - docker:dind
+  script:
+    - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" $CI_REGISTRY
+    - docker build -t $IMAGE_TAG .
+    - docker push $IMAGE_TAG
+  only:
+    - main

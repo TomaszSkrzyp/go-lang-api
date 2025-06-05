@@ -3,7 +3,9 @@ package main
 import (
 	"net/http"
 
+	"github.com/TomaszSkrzyp/go-lang-api/toDo/internal/dbControl"
 	"github.com/gorilla/mux"
+	_ "github.com/lib/pq"
 )
 
 func enableCors(next http.Handler) http.Handler {
@@ -22,20 +24,23 @@ func enableCors(next http.Handler) http.Handler {
 }
 
 func main() {
-	db := initDB()
+	db := dbControl.InitDB()
 	defer db.Close()
 
-	storage := todo_storage{
-		db: db,
+	storage := dbControl.TodoStorage{
+		DB: db,
 	}
 
 	router := mux.NewRouter()
-	router.HandleFunc("/todos/{id}", storage.handleGet).Methods("GET")
-	router.HandleFunc("/todos/{id}", storage.handleUpdateTask).Methods("PUT")
-	router.HandleFunc("/todos/{id}", storage.handleRemove).Methods("DELETE")
-	router.HandleFunc("/todos", storage.handleAdd).Methods("POST")
-	router.HandleFunc("/todos", storage.handleGetAll).Methods("GET")
+	router.HandleFunc("/todos/{id}", storage.HandleGet).Methods("GET")
+	router.HandleFunc("/todos/{id}", storage.HandleUpdateTask).Methods("PATCH")
+	router.HandleFunc("/todos/{id}", storage.HandleRemove).Methods("DELETE")
+	router.HandleFunc("/todos", storage.HandleAdd).Methods("POST")
+	router.HandleFunc("/todos", storage.HandleGetAll).Methods("GET")
 
+	fs := http.FileServer(http.Dir("./todo-frontend/build"))
+	router.PathPrefix("/").Handler(fs)
+	
 	handlersWithCors := enableCors(router)
 	http.ListenAndServe(":8090", handlersWithCors)
 }

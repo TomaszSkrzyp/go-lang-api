@@ -1,14 +1,15 @@
-package main
+package dbControl
 
 import (
 	"encoding/json"
 	"net/http"
 	"strconv"
 
+	"github.com/TomaszSkrzyp/go-lang-api/toDo/internal/models"
 	"github.com/gorilla/mux"
 )
 
-func (ts *todo_storage) handleGet(w http.ResponseWriter, r *http.Request) {
+func (ts *TodoStorage) HandleGet(w http.ResponseWriter, r *http.Request) {
 	itemId := mux.Vars(r)["id"]
 	item, err := ts.getOne(itemId)
 	if err == nil {
@@ -21,7 +22,7 @@ func (ts *todo_storage) handleGet(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 }
-func (ts *todo_storage) handleAdd(w http.ResponseWriter, r *http.Request) {
+func (ts *TodoStorage) HandleAdd(w http.ResponseWriter, r *http.Request) {
 	var newItem map[string]string
 	if err := json.NewDecoder(r.Body).Decode(&newItem); err != nil {
 		w.Header().Set("Content-Type", "application/json")
@@ -43,7 +44,7 @@ func (ts *todo_storage) handleAdd(w http.ResponseWriter, r *http.Request) {
 	if !statusOk {
 		status = "Pending"
 	}
-	if !isValidStatus(status) {
+	if !models.IsValidStatus(status) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadRequest)
 		json.NewEncoder(w).Encode(map[string]string{"error": "Invalid status value"})
@@ -76,7 +77,7 @@ func (ts *todo_storage) handleAdd(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(resp)
 }
 
-func (ts *todo_storage) handleGetAll(w http.ResponseWriter, r *http.Request) {
+func (ts *TodoStorage) HandleGetAll(w http.ResponseWriter, r *http.Request) {
 	statusFilter := r.URL.Query().Get("status")
 	pageStr := r.URL.Query().Get("page")
 	limitStr := r.URL.Query().Get("limit")
@@ -98,10 +99,10 @@ func (ts *todo_storage) handleGetAll(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var filtered []todo_item
+	var filtered []models.TodoItem
 
 	isValidStatus := false
-	for _, status := range possibleStatus {
+	for _, status := range models.PossibleStatus {
 		if status == statusFilter {
 			isValidStatus = true
 			break
@@ -137,7 +138,7 @@ func (ts *todo_storage) handleGetAll(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func (ts *todo_storage) handleRemove(w http.ResponseWriter, r *http.Request) {
+func (ts *TodoStorage) HandleRemove(w http.ResponseWriter, r *http.Request) {
 	itemId := mux.Vars(r)["id"]
 	if itemId == "" {
 		w.Header().Set("Content-Type", "application/json")
@@ -161,7 +162,7 @@ func (ts *todo_storage) handleRemove(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (ts *todo_storage) handleUpdateTask(w http.ResponseWriter, r *http.Request) {
+func (ts *TodoStorage) HandleUpdateTask(w http.ResponseWriter, r *http.Request) {
 	itemId := mux.Vars(r)["id"]
 	if itemId == "" {
 		w.Header().Set("Content-Type", "application/json")
@@ -235,7 +236,7 @@ func (ts *todo_storage) handleUpdateTask(w http.ResponseWriter, r *http.Request)
 		})
 		return
 	}
-	if !isValidStatus(status) {
+	if !models.IsValidStatus(status) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadRequest)
 		json.NewEncoder(w).Encode(map[string]string{

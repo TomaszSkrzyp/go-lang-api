@@ -1,0 +1,33 @@
+version: "3.8"
+
+services:
+  todo-postgres-db:
+    image: postgres:17
+    restart: always
+    environment:
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+      - ./schema_dump.sql:/docker-entrypoint-initdb.d/schema_dump.sql
+
+    ports:
+      - "5432:5432"
+
+  app:
+    container_name: my-golang-react-app
+    build: .
+    restart: always
+    depends_on:
+      - todo-postgres-db
+    environment:
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: ${DB_NAME}
+      DB_HOST: ${DB_HOST}
+    ports:
+      - "8090:8090"
+
+volumes:
+  db-data:

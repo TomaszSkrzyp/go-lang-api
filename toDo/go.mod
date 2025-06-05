@@ -1,8 +1,8 @@
 module github.com/TomaszSkrzyp/go-lang-api/toDo
 
-go 1.22.2
+go 1.22
 
 require (
-	github.com/gorilla/mux v1.8.1 
-	github.com/lib/pq v1.10.9 
+	github.com/gorilla/mux v1.8.1
+	github.com/lib/pq v1.10.9
 )

@@ -1,16 +1,16 @@
-package main
+package models
 
-type todo_item struct {
+type TodoItem struct {
 	ID     string `json:"id"`
 	Task   string `json:"task"`
 	Status string `json:"status"`
 	Due    string `json:"due"`
 }
 
-var possibleStatus = []string{"Completed", "In Progress", "Pending", "Canceled"}
+var PossibleStatus = []string{"Completed", "In Progress", "Pending", "Canceled"}
 
-func isValidStatus(status string) bool {
-	for _, s := range possibleStatus {
+func IsValidStatus(status string) bool {
+	for _, s := range PossibleStatus {
 		if s == status {
 			return true
 		}
