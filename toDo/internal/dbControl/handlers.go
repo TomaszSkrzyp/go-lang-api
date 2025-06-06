@@ -9,6 +9,9 @@ import (
 	"github.com/gorilla/mux"
 )
 
+// HandleGet handles the HTTP GET request to fetch a single task by its ID.
+// If the task exists, it responds with status 200 and the task in JSON format.
+// If the task is not found, it responds with 404 and an error message.
 func (ts *TodoStorage) HandleGet(w http.ResponseWriter, r *http.Request) {
 	itemId := mux.Vars(r)["id"]
 	item, err := ts.getOne(itemId)
@@ -22,6 +25,11 @@ func (ts *TodoStorage) HandleGet(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 }
+
+// HandleAdd handles the HTTP POST request to create a new task.
+// It expects a JSON body with "task", "status" (optional), and "due" fields.
+// Validates input, assigns default status if missing, and returns status 201 on success.
+// On validation or internal error, returns the appropriate error response.
 func (ts *TodoStorage) HandleAdd(w http.ResponseWriter, r *http.Request) {
 	var newItem map[string]string
 	if err := json.NewDecoder(r.Body).Decode(&newItem); err != nil {
@@ -77,6 +85,9 @@ func (ts *TodoStorage) HandleAdd(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(resp)
 }
 
+// HandleGetAll handles the HTTP GET request to retrieve all tasks.
+// Supports optional query parameters: "status" for filtering, and "page" & "limit" for pagination.
+// Responds with paginated and optionally filtered list of tasks.
 func (ts *TodoStorage) HandleGetAll(w http.ResponseWriter, r *http.Request) {
 	statusFilter := r.URL.Query().Get("status")
 	pageStr := r.URL.Query().Get("page")
@@ -138,6 +149,9 @@ func (ts *TodoStorage) HandleGetAll(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// HandleRemove handles the HTTP DELETE request to remove a task by its ID.
+// If the task is successfully removed, it returns status 200 with a success message.
+// If the ID is missing or the task cannot be removed, it returns an appropriate error.
 func (ts *TodoStorage) HandleRemove(w http.ResponseWriter, r *http.Request) {
 	itemId := mux.Vars(r)["id"]
 	if itemId == "" {
@@ -162,6 +176,9 @@ func (ts *TodoStorage) HandleRemove(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// HandleUpdateTask handles the HTTP PUT request to update an existing task by its ID.
+// Supports a special "changeUp" flag to move the task's status up instead of regular update.
+// Validates fields, applies changes, and returns success or error responses accordingly.
 func (ts *TodoStorage) HandleUpdateTask(w http.ResponseWriter, r *http.Request) {
 	itemId := mux.Vars(r)["id"]
 	if itemId == "" {

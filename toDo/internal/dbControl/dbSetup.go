@@ -9,6 +9,9 @@ import (
 	_ "github.com/lib/pq"
 )
 
+// InitDB initializes and returns a connection to the PostgreSQL database
+// using environment variables for configuration. Terminates the app if
+// connection fails.
 func InitDB() *sql.DB {
 	host := os.Getenv("DB_HOST")
 	user := os.Getenv("DB_USER")

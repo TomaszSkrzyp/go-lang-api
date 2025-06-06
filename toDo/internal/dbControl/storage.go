@@ -8,10 +8,13 @@ import (
 	_ "github.com/lib/pq"
 )
 
+// TodoStorage represents a wrapper around the database connection
+// used to operate on the `todos` table.
 type TodoStorage struct {
 	DB *sql.DB
 }
 
+// add inserts a new task into the `todos` table and returns the generated ID.
 func (r *TodoStorage) add(task, status, due string) (string, error) {
 	var id string
 	err := r.DB.QueryRow(
@@ -21,6 +24,7 @@ func (r *TodoStorage) add(task, status, due string) (string, error) {
 	return id, err
 }
 
+// changeTask updates the task, status, and due date for a given task ID.
 func (r *TodoStorage) changeTask(id, task, status, due string) error {
 	_, err := r.DB.Exec(
 		"UPDATE todos SET task=$1, status=$2, due=$3 WHERE id=$4",
@@ -29,11 +33,13 @@ func (r *TodoStorage) changeTask(id, task, status, due string) error {
 	return err
 }
 
+// remove deletes a task from the `todos` table by its ID.
 func (r *TodoStorage) remove(id string) error {
 	_, err := r.DB.Exec("DELETE FROM todos WHERE id=$1", id)
 	return err
 }
 
+// getAll retrieves all tasks from the database ordered by ID.
 func (r *TodoStorage) getAll() ([]models.TodoItem, error) {
 	rows, err := r.DB.Query("SELECT id, task, status, due FROM todos ORDER BY id")
 	if err != nil {
@@ -52,6 +58,7 @@ func (r *TodoStorage) getAll() ([]models.TodoItem, error) {
 	return todos, nil
 }
 
+// getOne fetches a single task by its ID.
 func (r *TodoStorage) getOne(id string) (models.TodoItem, error) {
 	var todo models.TodoItem
 	err := r.DB.QueryRow(
@@ -61,6 +68,8 @@ func (r *TodoStorage) getOne(id string) (models.TodoItem, error) {
 	return todo, err
 }
 
+// moveStatusUp transitions a task to the next status in the predefined flow.
+// Returns an error if the task can't be transitioned or does not exist.
 func (r *TodoStorage) moveStatusUp(id string) (string, error) {
 	var current string
 	err := r.DB.QueryRow("SELECT status FROM todos WHERE id = $1", id).Scan(&current)
@@ -96,6 +105,7 @@ func (r *TodoStorage) moveStatusUp(id string) (string, error) {
 	return newStatus, nil
 }
 
+// seedSampleData populates the database with sample tasks for testing/demo.
 func (r *TodoStorage) seedSampleData() {
 	r.add("Buy groceries", "Pending", "2025-06-10")
 	r.add("Clean the house", "Pending", "2025-06-11")
