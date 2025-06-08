@@ -1,140 +1,189 @@
-import React, { createContext, useState, useEffect } from "react";
+import React, { createContext, useState, useEffect, useContext } from 'react';
+import { AuthContext } from './AuthContext.js';
 
 export const TodoContext = createContext();
 
 export const TodoProvider = ({ children }) => {
+  const { token } = useContext(AuthContext);
+
+  const [todos, setTodos] = useState([]);
   const [page, setPage] = useState(1);
-  const [limit] = useState(5);
   const [total, setTotal] = useState(0);
-  const [todos, setTasks] = useState([]);
+  const limit = 5;
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  async function fetchWithErrorHandling(url, options) {
-    const res = await fetch(url, options);
-    if (!res.ok) {
-      let errorMsg = `Error: ${res.status}`;
-      try {
-        const data = await res.json();
-        if (data.error) errorMsg = data.error;
-        else if (data.message) errorMsg = data.message;
-      } catch {}
-      throw new Error(errorMsg);
+  const getHeaders = () => ({
+    'Content-Type': 'application/json',
+    Authorization: `Bearer ${token}`,
+  });
+
+  // Extract fetchTodos so it can be called anytime
+  const fetchTodos = async () => {
+    if (!token) {
+      setTodos([]);
+      setTotal(0);
+      return;
     }
-    return res.json();
-  }
 
-  const fetchTasks = async (page) => {
-  setLoading(true);
-  setError(null);
-  try {
-    const data = await fetchWithErrorHandling(
-      `http://localhost:8090/todos?page=${page}&limit=${limit}`
-    );
-    console.log('Backend response:', data);
-
-    const tasks = Array.isArray(data.tasks)
-      ? data.tasks
-      : Array.isArray(data)
-      ? data
-      : [];
-    setTasks(tasks);
-
-    const totalCount = data.total || (Array.isArray(tasks) ? tasks.length : 0);
-    setTotal(totalCount);
-  } catch (err) {
-    setError(err.message);
-  } finally {
-    setLoading(false);
-  }
-};
-
-  
-
-  const removeTask = async (taskId) => {
+    setLoading(true);
     setError(null);
+
     try {
-      await fetchWithErrorHandling(
-        `http://localhost:8090/todos/${taskId}`,
-        { method: "DELETE" }
+      const res = await fetch(
+        `http://localhost:8090/api/todos?page=${page}&limit=${limit}`,
+        {
+          headers: getHeaders(),
+        }
       );
-      if (todos.length <= 1 && page !== 1) {
-        setPage(page - 1);
-      } else {
-        fetchTasks(page);
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Failed to fetch tasks');
       }
+
+      const data = await res.json();
+      setTodos(data.tasks);
+      setTotal(data.total);
     } catch (err) {
       setError(err.message);
-    }
-  };
-  const updateTask = async (id, { task, status, due }) => {
-    setError(null);
-    try {
-      await fetchWithErrorHandling(`http://localhost:8090/todos/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ task, status, due }),
-      });
-      fetchTasks(page);
-    } catch (err) {
-      setError(err.message);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const moveStatusUp = async (id) => {
-    setError(null);
-    try {
-      await fetchWithErrorHandling(`http://localhost:8090/todos/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ changeUp: 'true' }),
-      });
-      fetchTasks(page);
-      
-    } catch (err) {
-      setError(err.message);
-    }
-  };
-
-  const addTask = async ({ task, status, due }) => {
-    setError(null);
-    if (!task?.trim()) {
-      setError("Task name is required.");
-      return;
-    }
-    if (!due?.trim()) {
-      setError("Due date is required.");
-      return;
-    }
-    try {
-      await fetchWithErrorHandling("http://localhost:8090/todos", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ task, status: status || undefined, due }),
-      });
-      fetchTasks(page);
-    } catch (err) {
-      setError(err.message);
-    }
-  };
+  // Fetch tasks on page or token change
   useEffect(() => {
-    fetchTasks(page);
-  }, [page]);
+    fetchTodos();
+  }, [page, token]);
+
+  const addTask = async (taskData) => {
+    if (!token) return;
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const res = await fetch('http://localhost:8090/api/todos', {
+        method: 'POST',
+        headers: getHeaders(),
+        body: JSON.stringify(taskData),
+      });
+       const text = await res.text();
+       if (!res.ok) {
+      // Try parsing JSON, fallback to raw text if fail
+      let errorMessage = 'Failed to add task';
+      try {
+        const data = JSON.parse(text);
+        errorMessage = data.error || errorMessage;
+      } catch {
+        errorMessage = text;
+      }
+      throw new Error(errorMessage);
+    }
+
+
+      await fetchTodos(); // refresh tasks immediately
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const updateTask = async (id, updatedData) => {
+    if (!token) return;
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const res = await fetch(`http://localhost:8090/api/todos/${id}`, {
+        method: 'PATCH',
+        headers: getHeaders(),
+        body: JSON.stringify(updatedData),
+      });
+       const text = await res.text();
+       if (!res.ok) {
+      // Try parsing JSON, fallback to raw text if fail
+      let errorMessage = 'Failed to update task';
+      try {
+        const data = JSON.parse(text);
+        errorMessage = data.error || errorMessage;
+      } catch {
+        errorMessage = text;
+      }
+      throw new Error(errorMessage);
+    }
+
+
+      await fetchTodos(); // refresh tasks immediately
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const removeTask = async (id) => {
+    if (!token) return;
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const res = await fetch(`http://localhost:8090/api/todos/${id}`, {
+        method: 'DELETE',
+        headers: getHeaders(),
+      });
+       const text = await res.text();
+       if (!res.ok) {
+      // Try parsing JSON, fallback to raw text if fail
+      let errorMessage = 'Failed to remove task';
+      try {
+        const data = JSON.parse(text);
+        errorMessage = data.error || errorMessage;
+      } catch {
+        errorMessage = text;
+      }
+      throw new Error(errorMessage);
+    }
+
+
+      await fetchTodos(); // refresh tasks immediately
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const moveStatusUp = (id) => {
+    const task = todos.find((t) => t.id === id);
+    if (!task) return;
+
+    const statusOrder = ['Pending', 'In Progress', 'Completed', 'Canceled'];
+    const currentIndex = statusOrder.indexOf(task.status);
+    if (currentIndex < statusOrder.length - 1) {
+      const newStatus = statusOrder[currentIndex + 1];
+      updateTask(id, { ...task, status: newStatus });
+    }
+  };
 
   return (
     <TodoContext.Provider
       value={{
         todos,
-        loading,
-        error,
         page,
         setPage,
         total,
         limit,
-        addTask,
-        updateTask,
-        removeTask,
+        loading,
+        error,
         moveStatusUp,
+        removeTask,
+        updateTask,
+        addTask,
       }}
     >
       {children}

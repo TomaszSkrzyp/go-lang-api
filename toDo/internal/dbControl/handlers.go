@@ -2,9 +2,11 @@ package dbControl
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 	"strconv"
 
+	"github.com/TomaszSkrzyp/go-lang-api/toDo/internal/auth"
 	"github.com/TomaszSkrzyp/go-lang-api/toDo/internal/models"
 	"github.com/gorilla/mux"
 )
@@ -283,4 +285,42 @@ func (ts *TodoStorage) HandleUpdateTask(w http.ResponseWriter, r *http.Request) 
 		})
 		return
 	}
+}
+
+// LoginHandler authenticates user credentials from JSON request.
+// On success, returns a JWT token; on failure, returns error status.
+func LoginHandler(w http.ResponseWriter, r *http.Request) {
+	// Hardcoded credentials
+	const (
+		hardcodedUsername = "admin"
+		hardcodedPassword = "password123"
+	)
+
+	var creds struct {
+		Username string `json:"username"`
+		Password string `json:"password"`
+	}
+	log.Println(r.Body)
+	err := json.NewDecoder(r.Body).Decode(&creds)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Invalid JSON"})
+		return
+	}
+
+	if creds.Username != hardcodedUsername || creds.Password != hardcodedPassword {
+		w.WriteHeader(http.StatusUnauthorized)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Invalid credentials"})
+		return
+	}
+
+	token, err := auth.GenerateToken(creds.Username)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Could not generate token"})
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"token": token})
 }

@@ -1,9 +1,12 @@
 import './App.css';
 import './main.css';
-import React, { useContext, useState } from 'react';
+import React, { useContext, useState, useEffect } from 'react';
 import { TodoContext } from './context/TodoContext.js';
+import Login from './LoginSite.js';
+import { AuthContext } from './context/AuthContext.js'; 
 
 function App() {
+  const { token,logout  } = useContext(AuthContext);
   const {
     todos,
     page,
@@ -26,6 +29,12 @@ function App() {
   const [editText, setEditText] = useState('');
   const [editStatus, setEditStatus] = useState('');
   const [editDue, setEditDue] = useState('');
+
+  // If no token, show Login component
+  
+  if (!token) {
+    return <Login />;
+  }
 
   const statusOptions = ['Pending', 'In Progress', 'Completed', 'Canceled'];
 
@@ -64,7 +73,9 @@ function App() {
   return (
     <div style={{ padding: '20px' }}>
       <h1>TODO List (Page {page})</h1>
-
+      <button onClick={logout} style={{ float: 'right', marginBottom: '10px' }}>
+        Logout
+      </button>
       {error && (
         <div
           style={{
@@ -195,26 +206,26 @@ function App() {
       )}
 
       <div className="pagination">
-  <button
-    onClick={() => setPage((p) => Math.max(p - 1, 1))}
-    disabled={page === 1}
-    className="pagination-btn"
-  >
-    Prev
-  </button>
+        <button
+          onClick={() => setPage((p) => Math.max(p - 1, 1))}
+          disabled={page === 1}
+          className="pagination-btn"
+        >
+          Prev
+        </button>
 
-  <span className="pagination-info">
-    Page {page} of {totalPages}
-  </span>
+        <span className="pagination-info">
+          Page {page} of {totalPages}
+        </span>
 
-  <button
-    onClick={() => setPage((p) => Math.min(p + 1, totalPages))}
-    disabled={page === totalPages}
-    className="pagination-btn"
-  >
-    Next
-  </button>
-</div>
+        <button
+          onClick={() => setPage((p) => Math.min(p + 1, totalPages))}
+          disabled={page === totalPages}
+          className="pagination-btn"
+        >
+          Next
+        </button>
+      </div>
     </div>
   );
 }

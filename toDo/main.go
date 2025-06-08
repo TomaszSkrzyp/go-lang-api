@@ -1,8 +1,11 @@
 package main
 
 import (
+	"encoding/json"
 	"net/http"
+	"strings"
 
+	"github.com/TomaszSkrzyp/go-lang-api/toDo/internal/auth"
 	"github.com/TomaszSkrzyp/go-lang-api/toDo/internal/dbControl"
 	"github.com/gorilla/mux"
 	_ "github.com/lib/pq"
@@ -25,6 +28,32 @@ func enableCors(next http.Handler) http.Handler {
 	})
 }
 
+func jwtMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		authorizarionHeader := r.Header.Get("Authorization")
+		if authorizarionHeader == "" {
+			w.WriteHeader(http.StatusUnauthorized)
+			json.NewEncoder(w).Encode(map[string]string{"error": "Missing Authorization header"})
+			return
+		}
+
+		parts := strings.Split(authorizarionHeader, " ")
+		if len(parts) != 2 || parts[0] != "Bearer" {
+			w.WriteHeader(http.StatusUnauthorized)
+			json.NewEncoder(w).Encode(map[string]string{"error": "Invalid Authorization header format"})
+			return
+		}
+		tokenStr := parts[1]
+		_, err := auth.ValidateToken(tokenStr)
+		if err != nil {
+			w.WriteHeader(http.StatusUnauthorized)
+			json.NewEncoder(w).Encode(map[string]string{"error": "Invalid token"})
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
 func main() {
 	// Initialize and defer-close the database connection
 	db := dbControl.InitDB()
@@ -35,12 +64,14 @@ func main() {
 
 	// Set up the router and endpoint handlers
 	router := mux.NewRouter()
-	router.HandleFunc("/todos/{id}", storage.HandleGet).Methods("GET")
-	router.HandleFunc("/todos/{id}", storage.HandleUpdateTask).Methods("PATCH")
-	router.HandleFunc("/todos/{id}", storage.HandleRemove).Methods("DELETE")
-	router.HandleFunc("/todos", storage.HandleAdd).Methods("POST")
-	router.HandleFunc("/todos", storage.HandleGetAll).Methods("GET")
+	// Protected routes - require valid JWT token
+	router.Handle("/api/todos/{id}", jwtMiddleware(http.HandlerFunc(storage.HandleGet))).Methods("GET")
+	router.Handle("/api/todos/{id}", jwtMiddleware(http.HandlerFunc(storage.HandleUpdateTask))).Methods("PATCH")
+	router.Handle("/api/todos/{id}", jwtMiddleware(http.HandlerFunc(storage.HandleRemove))).Methods("DELETE")
+	router.Handle("/api/todos", jwtMiddleware(http.HandlerFunc(storage.HandleAdd))).Methods("POST")
+	router.Handle("/api/todos", jwtMiddleware(http.HandlerFunc(storage.HandleGetAll))).Methods("GET")
 
+	router.HandleFunc("/login", dbControl.LoginHandler).Methods("POST")
 	// Serve static frontend (React build output, for example)
 	fs := http.FileServer(http.Dir("./todo-frontend/build"))
 	router.PathPrefix("/").Handler(fs)
