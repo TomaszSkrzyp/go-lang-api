@@ -18,7 +18,6 @@ export const TodoProvider = ({ children }) => {
     Authorization: `Bearer ${token}`,
   });
 
-  // Extract fetchTodos so it can be called anytime
   const fetchTodos = async () => {
     if (!token) {
       setTodos([]);
@@ -71,7 +70,6 @@ export const TodoProvider = ({ children }) => {
       });
        const text = await res.text();
        if (!res.ok) {
-      // Try parsing JSON, fallback to raw text if fail
       let errorMessage = 'Failed to add task';
       try {
         const data = JSON.parse(text);
@@ -82,8 +80,11 @@ export const TodoProvider = ({ children }) => {
       throw new Error(errorMessage);
     }
 
-
-      await fetchTodos(); // refresh tasks immediately
+      if (page === 1) {
+        await fetchTodos();  // refresh if already at page 1
+      } else {
+        setPage(1);          // it will fire useEffect and fetchTodos
+      }
     } catch (err) {
       setError(err.message);
     } finally {
@@ -105,7 +106,6 @@ export const TodoProvider = ({ children }) => {
       });
        const text = await res.text();
        if (!res.ok) {
-      // Try parsing JSON, fallback to raw text if fail
       let errorMessage = 'Failed to update task';
       try {
         const data = JSON.parse(text);
@@ -116,8 +116,11 @@ export const TodoProvider = ({ children }) => {
       throw new Error(errorMessage);
     }
 
-
-      await fetchTodos(); // refresh tasks immediately
+      if (page === 1) {
+        await fetchTodos();  // refresh if already at page 1
+      } else {
+        setPage(1);          // it will fire useEffect and fetchTodos
+      }
     } catch (err) {
       setError(err.message);
     } finally {
@@ -138,7 +141,6 @@ export const TodoProvider = ({ children }) => {
       });
        const text = await res.text();
        if (!res.ok) {
-      // Try parsing JSON, fallback to raw text if fail
       let errorMessage = 'Failed to remove task';
       try {
         const data = JSON.parse(text);
@@ -149,8 +151,11 @@ export const TodoProvider = ({ children }) => {
       throw new Error(errorMessage);
     }
 
-
-      await fetchTodos(); // refresh tasks immediately
+      if (page === 1) {
+        await fetchTodos();  // refresh if already at page 1
+      } else {
+        setPage(1);          // it will fire useEffect and fetchTodos
+      }
     } catch (err) {
       setError(err.message);
     } finally {
@@ -165,8 +170,7 @@ export const TodoProvider = ({ children }) => {
     const statusOrder = ['Pending', 'In Progress', 'Completed', 'Canceled'];
     const currentIndex = statusOrder.indexOf(task.status);
     if (currentIndex < statusOrder.length - 1) {
-      const newStatus = statusOrder[currentIndex + 1];
-      updateTask(id, { ...task, status: newStatus });
+       updateTask(id, { changeUp: 'true' }); 
     }
   };
 

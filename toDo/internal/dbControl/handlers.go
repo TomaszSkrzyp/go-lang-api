@@ -4,7 +4,9 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"sort"
 	"strconv"
+	"time"
 
 	"github.com/TomaszSkrzyp/go-lang-api/toDo/internal/auth"
 	"github.com/TomaszSkrzyp/go-lang-api/toDo/internal/models"
@@ -89,7 +91,8 @@ func (ts *TodoStorage) HandleAdd(w http.ResponseWriter, r *http.Request) {
 
 // HandleGetAll handles the HTTP GET request to retrieve all tasks.
 // Supports optional query parameters: "status" for filtering, and "page" & "limit" for pagination.
-// Responds with paginated and optionally filtered list of tasks.
+// Responds with a paginated and optionally filtered list of tasks,
+// sorted by due date (ascending), with completed tasks always listed last.
 func (ts *TodoStorage) HandleGetAll(w http.ResponseWriter, r *http.Request) {
 	statusFilter := r.URL.Query().Get("status")
 	pageStr := r.URL.Query().Get("page")
@@ -131,7 +134,31 @@ func (ts *TodoStorage) HandleGetAll(w http.ResponseWriter, r *http.Request) {
 	} else {
 		filtered = allTasks
 	}
+	sort.Slice(filtered, func(i, j int) bool {
+		if filtered[i].Status == "Completed" && filtered[j].Status != "Completed" {
+			return false
+		}
+		if filtered[i].Status != "Completed" && filtered[j].Status == "Completed" {
+			return true
+		}
 
+		layout := "2006-01-02"
+
+		dueI, errI := time.Parse(layout, filtered[i].Due)
+		dueJ, errJ := time.Parse(layout, filtered[j].Due)
+
+		if errI != nil && errJ != nil {
+			return false
+		}
+		if errI != nil {
+			return false
+		}
+		if errJ != nil {
+			return true
+		}
+
+		return dueI.Before(dueJ)
+	})
 	start := (page - 1) * limit
 	if start > len(filtered) {
 		start = len(filtered)
@@ -192,6 +219,7 @@ func (ts *TodoStorage) HandleUpdateTask(w http.ResponseWriter, r *http.Request) 
 	var newItem map[string]string
 	if err := json.NewDecoder(r.Body).Decode(&newItem); err != nil {
 		w.Header().Set("Content-Type", "application/json")
+		log.Println(newItem)
 		w.WriteHeader(http.StatusBadRequest)
 		json.NewEncoder(w).Encode(map[string]string{
 			"error": "Invalid request body",
