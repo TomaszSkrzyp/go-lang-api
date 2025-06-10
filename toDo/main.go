@@ -61,7 +61,7 @@ func main() {
 
 	// Initialize data layer with DB connection
 	storage := dbControl.TodoStorage{DB: db}
-
+	//storage.seedSampleData
 	// Set up the router and endpoint handlers
 	router := mux.NewRouter()
 	// Protected routes - require valid JWT token
