@@ -193,13 +193,17 @@ func (ts *TodoStorage) HandleRemove(w http.ResponseWriter, r *http.Request) {
 func (ts *TodoStorage) HandleUpdateTask(w http.ResponseWriter, r *http.Request) {
 	itemId := mux.Vars(r)["id"]
 	if itemId == "" {
-		http.Error(w, `{"error":"Missing id in URL path"}`, http.StatusBadRequest)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Missing id in URL path"})
 		return
 	}
 
 	var newItem map[string]string
 	if err := json.NewDecoder(r.Body).Decode(&newItem); err != nil {
-		http.Error(w, `{"error":"Invalid request body"}`, http.StatusBadRequest)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Invalid request body"})
 		return
 	}
 
@@ -207,7 +211,10 @@ func (ts *TodoStorage) HandleUpdateTask(w http.ResponseWriter, r *http.Request) 
 	if changeStr, ok := newItem["changeUp"]; ok {
 		changeUp, err := strconv.ParseBool(changeStr)
 		if err != nil {
-			http.Error(w, `{"error":"Invalid 'changeUp' value; expected 'true' or 'false'"}`, http.StatusBadRequest)
+
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(map[string]string{"error": "Invalid 'changeUp' value; expected 'true' or 'false'" + err.Error()})
 			return
 		}
 		if changeUp {

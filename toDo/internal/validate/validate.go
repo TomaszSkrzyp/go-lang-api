@@ -3,7 +3,6 @@ package validate
 import (
 	"errors"
 	"strings"
-	"time"
 
 	"github.com/microcosm-cc/bluemonday"
 
@@ -38,12 +37,6 @@ func SanitizeAndValidateTaskInput(data map[string]string) (string, string, strin
 		return "", "", "", errors.New("missing or empty 'due' field")
 	}
 	due = sanitizeString(due)
-
-	// Validate date format (optional)
-	_, err := time.Parse("2006-01-02", due)
-	if err != nil {
-		return "", "", "", errors.New("invalid due date format, expected YYYY-MM-DD")
-	}
 
 	return task, status, due, nil
 }
