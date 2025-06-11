@@ -1,6 +1,6 @@
 import React, { createContext, useState, useEffect, useContext } from 'react';
 import { AuthContext } from './AuthContext.js';
-
+import PropTypes from 'prop-types';
 export const TodoContext = createContext();
 
 export const TodoProvider = ({ children }) => {
@@ -193,4 +193,7 @@ export const TodoProvider = ({ children }) => {
       {children}
     </TodoContext.Provider>
   );
+};
+TodoProvider.propTypes = {
+  children: PropTypes.node.isRequired,
 };

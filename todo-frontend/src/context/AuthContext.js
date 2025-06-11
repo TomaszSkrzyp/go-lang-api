@@ -1,5 +1,5 @@
 import React, { createContext, useState, useEffect } from "react";
-
+import PropTypes from 'prop-types';
 export const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
@@ -19,3 +19,6 @@ export const AuthProvider = ({ children }) => {
     </AuthContext.Provider>
   );
 }
+AuthProvider.propTypes = {
+  children: PropTypes.node.isRequired,
+};

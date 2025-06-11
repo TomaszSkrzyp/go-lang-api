@@ -1,4 +1,4 @@
-import React, { useState, useContext } from "react";
+import { useState, useContext } from "react";
 import { AuthContext } from "./context/AuthContext.js";
 
 function Login() {
@@ -28,6 +28,8 @@ function Login() {
       // Update token in AuthContext (which updates localStorage via effect)
       setToken(data.token);
     } catch (err) {
+      console.error(err);
+
       setError("Network error");
     }
   };

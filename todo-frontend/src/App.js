@@ -1,6 +1,6 @@
 import './App.css';
 import './main.css';
-import React, { useContext, useState, useEffect } from 'react';
+import  { useContext, useState } from 'react';
 import { TodoContext } from './context/TodoContext.js';
 import Login from './LoginSite.js';
 import { AuthContext } from './context/AuthContext.js'; 
