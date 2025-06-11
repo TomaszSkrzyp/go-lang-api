@@ -24,7 +24,7 @@ lint_frontend:
   script:
     - cd todo-frontend
     - npm ci
-    - npm run lint || echo "Linting skipped or not configured"
+    - npm eslint src || echo "Linting skipped or not configured"
 
 # Test Jobs
 test_backend:
