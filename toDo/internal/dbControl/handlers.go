@@ -10,6 +10,9 @@ import (
 
 	"github.com/TomaszSkrzyp/go-lang-api/toDo/internal/auth"
 	"github.com/TomaszSkrzyp/go-lang-api/toDo/internal/models"
+
+	"github.com/TomaszSkrzyp/go-lang-api/toDo/internal/validate"
+
 	"github.com/gorilla/mux"
 )
 
@@ -43,29 +46,11 @@ func (ts *TodoStorage) HandleAdd(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	task, taskOk := newItem["task"]
-	status, statusOk := newItem["status"]
-	due, dueOk := newItem["due"]
-
-	if !taskOk {
+	task, status, due, err := validate.SanitizeAndValidateTaskInput(newItem)
+	if err != nil {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{"error": "Missing a required field: task"})
-		return
-	}
-	if !statusOk {
-		status = "Pending"
-	}
-	if !models.IsValidStatus(status) {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{"error": "Invalid status value"})
-		return
-	}
-	if !dueOk || due == "" {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{"error": "Missing or empty required field: due"})
+		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
 		return
 	}
 
@@ -82,9 +67,6 @@ func (ts *TodoStorage) HandleAdd(w http.ResponseWriter, r *http.Request) {
 	resp := map[string]string{
 		"message": "Task added successfully",
 		"id":      itemId,
-	}
-	if !statusOk {
-		resp["note"] = "Status not provided, defaulted to 'Pending'"
 	}
 	json.NewEncoder(w).Encode(resp)
 }
@@ -211,108 +193,62 @@ func (ts *TodoStorage) HandleRemove(w http.ResponseWriter, r *http.Request) {
 func (ts *TodoStorage) HandleUpdateTask(w http.ResponseWriter, r *http.Request) {
 	itemId := mux.Vars(r)["id"]
 	if itemId == "" {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{"error": "Missing id in URL path"})
+		http.Error(w, `{"error":"Missing id in URL path"}`, http.StatusBadRequest)
 		return
 	}
+
 	var newItem map[string]string
 	if err := json.NewDecoder(r.Body).Decode(&newItem); err != nil {
-		w.Header().Set("Content-Type", "application/json")
-		log.Println(newItem)
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{
-			"error": "Invalid request body",
-		})
+		http.Error(w, `{"error":"Invalid request body"}`, http.StatusBadRequest)
 		return
-
 	}
 
-	changeStatusUpStr, changeOk := newItem["changeUp"]
-	task, taskOk := newItem["task"]
-	status, statusOk := newItem["status"]
-	due, dueOk := newItem["due"]
-
-	if changeOk {
-		changeStatusUp, err := strconv.ParseBool(changeStatusUpStr)
+	// Handle changeUp logic
+	if changeStr, ok := newItem["changeUp"]; ok {
+		changeUp, err := strconv.ParseBool(changeStr)
 		if err != nil {
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusBadRequest)
-			json.NewEncoder(w).Encode(map[string]string{
-				"error": "Invalid value for 'changeUp'; expected 'true' or 'false'",
-			})
+			http.Error(w, `{"error":"Invalid 'changeUp' value; expected 'true' or 'false'"}`, http.StatusBadRequest)
 			return
 		}
-		if changeStatusUp {
+		if changeUp {
 			newStatus, err := ts.moveStatusUp(itemId)
 			w.Header().Set("Content-Type", "application/json")
-			if err == nil {
+			if err != nil {
+				w.WriteHeader(http.StatusConflict)
+				json.NewEncoder(w).Encode(map[string]string{
+					"message": "Status of this task can't be moved up",
+					"id":      itemId,
+				})
+			} else {
 				w.WriteHeader(http.StatusOK)
 				json.NewEncoder(w).Encode(map[string]string{
 					"message":   "Status moved up",
 					"id":        itemId,
 					"newStatus": newStatus,
 				})
-			} else {
-				w.WriteHeader(http.StatusConflict)
-				json.NewEncoder(w).Encode(map[string]string{
-					"message": "Status of this task can't be moved up",
-					"id":      itemId,
-				})
 			}
 			return
 		}
 	}
 
-	if !taskOk {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{
-			"error": "Missing 'task' field",
-		})
-		return
-	}
-	if !statusOk {
-		status = "Pending"
-	}
-	if !dueOk {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{
-			"error": "Missing 'due' field",
-		})
-		return
-	}
-	if !models.IsValidStatus(status) {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{
-			"error": "Invalid status value",
-		})
+	// Use common sanitization
+	task, status, due, err := validate.SanitizeAndValidateTaskInput(newItem)
+	if err != nil {
+		http.Error(w, `{"error":"`+err.Error()+`"}`, http.StatusBadRequest)
 		return
 	}
 
-	err := ts.changeTask(itemId, task, status, due)
-	if err == nil {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		resp := map[string]string{
-			"message": "Task updated successfully",
-			"id":      itemId,
-		}
-		if !statusOk {
-			resp["note"] = "Status not provided, defaulted to 'Pending'"
-		}
-		json.NewEncoder(w).Encode(resp)
-	} else {
-
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]string{
-			"error": "Failed to update task: " + err.Error(),
-		})
+	err = ts.changeTask(itemId, task, status, due)
+	if err != nil {
+		http.Error(w, `{"error":"Failed to update task: `+err.Error()+`"}`, http.StatusInternalServerError)
 		return
 	}
+
+	resp := map[string]string{
+		"message": "Task updated successfully",
+		"id":      itemId,
+	}
+	json.NewEncoder(w).Encode(resp)
 }
 
 // LoginHandler authenticates user credentials from JSON request.
