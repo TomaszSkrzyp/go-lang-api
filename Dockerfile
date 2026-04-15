@@ -1,27 +1,25 @@
-#run backend build
+# build backend - static binary with stripped debug info
 FROM golang:1.22-alpine AS backend-build
-
-WORKDIR /go-lang-api/toDo
-COPY ./toDo/go.mod ./toDo/go.sum ./
-
+WORKDIR /app
+COPY backend/go.mod backend/go.sum ./
 RUN go mod download
-COPY ./toDo ./
+COPY backend/ .
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o main .
 
-RUN go build -o toDo 
-
-# run frontend build
+# build frontend assets
 FROM node:18-alpine AS frontend-build
-WORKDIR /go-lang-api/todo-frontend
-COPY ./todo-frontend/package.json ./todo-frontend/package-lock.json ./
+WORKDIR /app
+COPY frontend/package*.json ./
 RUN npm install
-COPY ./todo-frontend ./
+COPY frontend/ .
 RUN npm run build
 
-# lightweight image
+# minimal runtime image
 FROM alpine:latest
+RUN apk --no-cache add ca-certificates
 WORKDIR /app
-COPY --from=backend-build /go-lang-api/toDo .
-COPY --from=frontend-build /go-lang-api/todo-frontend/build ./todo-frontend/build
+COPY --from=backend-build /app/main .
+COPY --from=frontend-build /app/build ./frontend/build
 
 EXPOSE 8090
-CMD ["./toDo"]
+CMD ["./main"]
